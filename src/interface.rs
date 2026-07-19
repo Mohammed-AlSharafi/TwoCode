@@ -1,6 +1,6 @@
 use core::error;
 use ratatui::{
-    Terminal, backend::CrosstermBackend, crossterm::event::{self, Event, KeyCode}, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Color, Modifier, Style}, widgets::{Block, Borders, Paragraph, Wrap},
+    Terminal, backend::CrosstermBackend, crossterm::event::{self, Event, KeyCode}, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Color, Modifier, Style}, widgets::{Block, Borders, Padding, Paragraph, Wrap},
 };
 use std::{time::Duration};
 use tokio::sync::mpsc;
@@ -61,7 +61,7 @@ impl Interface {
                 .collect::<Vec<(String, Style)>>();
 
             let history_widgets = history_texts.iter().map(|(text, style)| {
-                let paragraph = Paragraph::new(tui_markdown::from_str(text)).style(*style).wrap(Wrap { trim: false });
+                let paragraph = Paragraph::new(tui_markdown::from_str(text)).style(*style).wrap(Wrap { trim: false }).block(Block::default().padding(Padding::uniform(1)));
                 history_total_height += paragraph.line_count(history_width);
                 paragraph
             }).collect::<Vec<Paragraph>>();
