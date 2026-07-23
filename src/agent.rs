@@ -9,25 +9,25 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use crate::events::DisplayEvent;
 use crate::tools::Tool;
 
-pub struct Agent<'a> {
+pub struct Agent {
     client: Client<OpenAIConfig>,
-    model: &'a str,
+    model: String,
     messages: Vec<Value>,
-    specs: &'a [fn() -> Value],
+    specs: Vec<fn() -> Value>,
     functions:
-        HashMap<&'a str, fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>>,
+        HashMap<String, fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>>,
     event_tx: UnboundedSender<DisplayEvent>,
     prompt_rx: UnboundedReceiver<String>,
 }
 
-impl<'a> Agent<'a> {
+impl Agent {
     pub fn with_history(
         client: Client<OpenAIConfig>,
-        model: &'a str,
+        model: String,
         messages: Vec<Value>,
-        specs: &'a [fn() -> Value],
+        specs: Vec<fn() -> Value>,
         functions: HashMap<
-            &'a str,
+            String,
             fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>,
         >,
         event_tx: UnboundedSender<DisplayEvent>,

@@ -39,12 +39,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let model = "qwen/qwen3.6-27b";
 
     let mut functions: HashMap<
-        &str,
+        String,
         fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>,
     > = HashMap::new();
-    functions.insert("Read", read_file);
-    functions.insert("Write", write_file);
-    functions.insert("Bash", execute_bash);
+    functions.insert("Read".to_string(), read_file);
+    functions.insert("Write".to_string(), write_file);
+    functions.insert("Bash".to_string(), execute_bash);
 
     let messages: Vec<Value> = Vec::<Value>::new();
 
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (event_tx, event_rx) = mpsc::unbounded_channel::<DisplayEvent>();
     let (prompt_tx, prompt_rx) = mpsc::unbounded_channel::<String>();
 
-    let mut agent = Agent::with_history(client, model, messages, &specs, functions, event_tx, prompt_rx);
+    let mut agent = Agent::with_history(client, model.to_string(), messages, specs, functions, event_tx, prompt_rx);
     let mut interface = Interface::new(prompt_tx, event_rx);
 
     let (agent_result, interface_result) = tokio::join!(agent.run(), interface.run());
