@@ -51,15 +51,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let specs = vec![bash_tool_spec, write_tool_spec, read_tool_spec];
     
     let (event_tx, event_rx) = mpsc::unbounded_channel::<DisplayEvent>();
-    let (prompt_tx, prompt_rx) = mpsc::unbounded_channel::<String>();
 
-    let mut agent = Agent::with_history(client, model.to_string(), messages, specs, functions, event_tx, prompt_rx);
-    let mut interface = Interface::new(prompt_tx, event_rx);
+    let mut agent = Agent::with_history(client, model.to_string(), messages, specs, functions, event_tx);
+    let mut interface = Interface::new(event_rx);
 
-    let (agent_result, interface_result) = tokio::join!(agent.run(), interface.run());
+    let _ = interface.run(&mut agent).await?;
 
-    interface_result?;
-    agent_result?;
+    // let (agent_result, interface_result) = tokio::join!(agent.run(), interface.run());
+
+    // interface_result?;
+    // agent_result?;
 
     Ok(())
 }

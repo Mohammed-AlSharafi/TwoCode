@@ -1,10 +1,9 @@
-use core::error;
 use std::collections::{HashMap, hash_map::Entry};
 
 use async_openai::{Client, config::OpenAIConfig};
 use futures::StreamExt;
 use serde_json::{Map, Value, json};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::{UnboundedSender};
 
 use crate::events::DisplayEvent;
 use crate::tools::Tool;
@@ -17,7 +16,6 @@ pub struct Agent {
     functions:
         HashMap<String, fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>>,
     event_tx: UnboundedSender<DisplayEvent>,
-    prompt_rx: UnboundedReceiver<String>,
 }
 
 impl Agent {
@@ -31,7 +29,6 @@ impl Agent {
             fn(&Map<String, Value>) -> Result<String, Box<dyn std::error::Error>>,
         >,
         event_tx: UnboundedSender<DisplayEvent>,
-        prompt_rx: UnboundedReceiver<String>,
     ) -> Self {
         Agent {
             client,
@@ -40,18 +37,7 @@ impl Agent {
             specs,
             functions,
             event_tx,
-            prompt_rx,
         }
-    }
-
-    pub async fn run(&mut self) -> Result<(), Box<dyn error::Error>>{
-        while let Some(prompt) = self.prompt_rx.recv().await{
-            if let Err(error) = self.agent_loop(Some(prompt)).await{
-                self.event_tx.send(DisplayEvent::Error(error.to_string())).ok();
-                return Err(error);
-            }
-        }
-        Ok(())
     }
 
     pub async fn agent_loop(
