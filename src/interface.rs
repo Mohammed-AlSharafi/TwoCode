@@ -95,6 +95,7 @@ impl Interface {
 
             self.history
                 .push(DisplayBlock::new(BlockType::User, prompt.to_owned()));
+            self.history_scroll_state.scroll_to_bottom();
 
             let agent_future = agent.agent_loop(Some(prompt));
             tokio::pin!(agent_future);
@@ -207,7 +208,6 @@ impl Interface {
         if let Some(last) = self.history.last_mut() {
             //see of the current chunk is a continuation for the previous chunk
             match (event, &last.block_type) {
-                (DisplayEvent::User(new), BlockType::User)
                 | (DisplayEvent::Content(new), BlockType::Content)
                 | (DisplayEvent::Reasoning(new), BlockType::Reasoning { .. })
                 | (DisplayEvent::Error(new), BlockType::Error) => {
@@ -223,7 +223,6 @@ impl Interface {
         let (block_type, content) = match event {
             DisplayEvent::Content(c) => (BlockType::Content, c.to_owned()),
             DisplayEvent::Error(c) => (BlockType::Error, c.to_owned()),
-            DisplayEvent::User(c) => (BlockType::User, c.to_owned()),
             DisplayEvent::Reasoning(c) => (BlockType::Reasoning { expanded: false }, c.to_owned()),
             DisplayEvent::ToolCall(c) => (
                 BlockType::ToolCall,
