@@ -3,6 +3,7 @@ mod interface;
 mod specs;
 mod tools;
 mod events;
+mod system_prompt;
 
 use tools::{execute_bash, read_file, write_file};
 

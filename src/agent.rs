@@ -3,7 +3,7 @@ use std::collections::{HashMap, hash_map::Entry};
 use async_openai::{Client, config::OpenAIConfig};
 use futures::StreamExt;
 use serde_json::{Map, Value, json};
-use tokio::sync::mpsc::{UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::events::DisplayEvent;
 use crate::tools::Tool;
@@ -59,21 +59,32 @@ impl Agent {
                     "messages": &self.messages,
                     "model": &self.model,
                     "tools": tools_specs,
-                    "stream": true
+                    "stream": true,
+                    "max_completion_tokens": 16384,
                 }))
                 .await?;
 
             let mut content = Vec::<String>::new();
 
             let mut tools = HashMap::<u64, Tool>::new();
+            let mut finish_reason: Option<String> = None;
 
-            println!();
             while let Some(chunk_result) = stream.next().await {
-                let Ok(chunk) = chunk_result else {
-                    continue;
+                let chunk = match chunk_result {
+                    Ok(c) => c,
+                    Err(e) => {
+                        finish_reason = Some("stream_error".to_string());
+                        self.display_error(e.to_string()).ok();
+                        //keep whatever content we've accumulated so far
+                        break;
+                    }
                 };
 
                 let delta = &chunk["choices"][0]["delta"];
+
+                if let Some(reason) = chunk["choices"][0]["finish_reason"].as_str() {
+                    finish_reason = Some(reason.to_string());
+                }
 
                 if let Some(reasoning_str_chunk) = delta["reasoning"].as_str() {
                     self.event_tx
@@ -112,17 +123,30 @@ impl Agent {
                                     break;
                                 };
 
-                                entry.insert(Tool {
-                                    id: tool_id.to_string(),
-                                    name: tool_name.to_string(),
-                                    arguments: arguments.to_string(),
-                                });
+                                entry.insert(Tool::new(
+                                    tool_id.to_string(),
+                                    tool_name.to_string(),
+                                    arguments.to_string(),
+                                    None,
+                                ));
                             }
                         }
                     }
                 }
             }
-            println!();
+
+            if let Some(ref reason) = finish_reason {
+                if reason != "tool_calls" {
+                    let stop_error = match reason.as_str(){
+                    "length" => "Response truncated: max tokens reached. Consider increasing max_completion_tokens.".to_string(),
+                    "content_filter" => "Content was omitted because it was flagged by the moderation/safety filters.".to_string(),
+                    "stop" => break,
+                    other => format!("Stream finished with reason: {}", other)
+                };
+                    self.display_error(stop_error).ok();
+                    break;
+                }
+            }
 
             if tools.is_empty() {
                 break;
@@ -154,7 +178,9 @@ impl Agent {
             // if and else need to be blocks, and they must return same type.
 
             for (_, tool) in sorted_tools {
-                self.event_tx.send(DisplayEvent::ToolCall(tool.clone())).ok();
+                self.event_tx
+                    .send(DisplayEvent::ToolCall(tool.clone()))
+                    .ok();
                 let Some(function) = self.functions.get(tool.name.as_str()) else {
                     eprintln!("{}", "[Tool Execution]: Tool not found!");
                     continue;
@@ -182,6 +208,11 @@ impl Agent {
                 }));
             }
         }
+        Ok(())
+    }
+
+    fn display_error(&self, error: String) -> Result<(), Box<dyn std::error::Error>> {
+        self.event_tx.send(DisplayEvent::Error(error))?;
         Ok(())
     }
 }

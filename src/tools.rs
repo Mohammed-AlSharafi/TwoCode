@@ -8,6 +8,14 @@ pub struct Tool {
     pub id: String,
     pub name: String,
     pub arguments: String,
+    pub result: String
+}
+
+impl Tool{
+    pub fn new(id: String, name: String, arguments: String, result: Option<String>) -> Self{
+        let result = result.unwrap_or("No result provided".to_owned());
+        Tool { id, name, arguments, result }
+    }
 }
 
 pub fn read_file(input: &Map<String, Value>) -> Result<String, Box<dyn std::error::Error>> {
