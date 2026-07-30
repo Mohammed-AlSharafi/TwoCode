@@ -1,7 +1,6 @@
 use core::error;
 use crossterm::{
-    event::{EnableMouseCapture, MouseButton, MouseEventKind},
-    execute,
+    event::{DisableMouseCapture, EnableMouseCapture, MouseButton, MouseEventKind}, execute,
 };
 use ratatui::{
     Terminal,
@@ -138,7 +137,12 @@ impl Interface {
             let prompt_chunk = chunks[1];
 
             let input_widget = Paragraph::new(format!("❯ {}", self.input))
-                .block(Block::default().borders(Borders::ALL).title("Prompt")).wrap(Wrap { trim: false });
+                .block(
+                    Block::default()
+                        .borders(Borders::TOP | Borders::BOTTOM)
+                        .title("Prompt"),
+                )
+                .wrap(Wrap { trim: false });
             frame.render_widget(input_widget, prompt_chunk);
 
             let history_width = history_chunk.width.max(1); //we pick the max between 1 and history chunk's width
@@ -208,7 +212,7 @@ impl Interface {
         if let Some(last) = self.history.last_mut() {
             //see of the current chunk is a continuation for the previous chunk
             match (event, &last.block_type) {
-                | (DisplayEvent::Content(new), BlockType::Content)
+                (DisplayEvent::Content(new), BlockType::Content)
                 | (DisplayEvent::Reasoning(new), BlockType::Reasoning { .. })
                 | (DisplayEvent::Error(new), BlockType::Error) => {
                     last.content.push_str(new);
@@ -309,6 +313,7 @@ impl Interface {
     }
 
     fn terminate_interface(&self) {
+        let _ = execute!(stdout(), DisableMouseCapture);
         ratatui::restore();
     }
 }
