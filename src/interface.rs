@@ -1,6 +1,7 @@
 use core::error;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, MouseButton, MouseEventKind}, execute,
+    event::{DisableMouseCapture, EnableMouseCapture, MouseButton, MouseEventKind},
+    execute,
 };
 use ratatui::{
     Terminal,
@@ -35,7 +36,7 @@ enum Tick {
 }
 enum BlockType {
     User,
-    Reasoning { expanded: bool },
+    Reasoning { expanded: bool, hovered: bool },
     Content,
     ToolCall,
     Error,
@@ -155,7 +156,7 @@ impl Interface {
                         Style::default().bg(Color::Rgb(31, 31, 31)),
                     ),
                     BlockType::Content => (item.content.to_owned(), Style::default()),
-                    BlockType::Reasoning { expanded } => (
+                    BlockType::Reasoning { expanded, hovered } => (
                         if expanded {
                             item.content.to_owned()
                         } else {
@@ -165,7 +166,11 @@ impl Interface {
                                 "Thinking".to_owned()
                             }
                         },
-                        Style::default().add_modifier(Modifier::ITALIC).dim(),
+                        if hovered {
+                            Style::default().add_modifier(Modifier::ITALIC)
+                        } else {
+                            Style::default().add_modifier(Modifier::ITALIC).dim()
+                        },
                     ),
                     BlockType::Error => (item.content.to_owned(), Style::default().red()),
                     BlockType::ToolCall => (item.content.to_owned(), Style::default()),
@@ -227,7 +232,13 @@ impl Interface {
         let (block_type, content) = match event {
             DisplayEvent::Content(c) => (BlockType::Content, c.to_owned()),
             DisplayEvent::Error(c) => (BlockType::Error, c.to_owned()),
-            DisplayEvent::Reasoning(c) => (BlockType::Reasoning { expanded: false }, c.to_owned()),
+            DisplayEvent::Reasoning(c) => (
+                BlockType::Reasoning {
+                    expanded: false,
+                    hovered: false,
+                },
+                c.to_owned(),
+            ),
             DisplayEvent::ToolCall(c) => (
                 BlockType::ToolCall,
                 format!("Tool:{} {}", c.name, c.arguments),
@@ -280,16 +291,15 @@ impl Interface {
                         // adding the scroll offset, so the click lands on the
                         // correct block regardless of scroll position.
                         let scroll_offset = self.history_scroll_state.offset();
-                        let content_pos = Position::new(
+                        let mouse_pos = Position::new(
                             mouse_event.column.saturating_add(scroll_offset.x),
                             mouse_event.row.saturating_add(scroll_offset.y),
                         );
 
                         for block in &mut self.history {
-                            if block.area.contains(content_pos) {
-                                match &mut block.block_type {
-                                    BlockType::Reasoning { expanded } => *expanded = !*expanded,
-                                    _ => {}
+                            if let BlockType::Reasoning { expanded, .. } = &mut block.block_type {
+                                if block.area.contains(mouse_pos) {
+                                    *expanded = !*expanded
                                 }
                             }
                         }
@@ -303,6 +313,23 @@ impl Interface {
                     MouseEventKind::ScrollUp => {
                         for _ in 0..SCROLL_SPEED {
                             self.history_scroll_state.scroll_up();
+                        }
+                    }
+
+                    MouseEventKind::Moved => {
+                        let scroll_offset = self.history_scroll_state.offset();
+                        let mouse_pos = Position::new(
+                            mouse_event.column.saturating_add(scroll_offset.x),
+                            mouse_event.row.saturating_add(scroll_offset.y),
+                        );
+                        for block in &mut self.history {
+                            if let BlockType::Reasoning { hovered, .. } = &mut block.block_type {
+                                if block.area.contains(mouse_pos) {
+                                    *hovered = true
+                                } else {
+                                    *hovered = false
+                                }
+                            }
                         }
                     }
                     _ => {}
